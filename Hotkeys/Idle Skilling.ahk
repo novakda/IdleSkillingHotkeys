@@ -40,6 +40,12 @@ Right:: NextFlower
 
 Left:: PrevFlower
 
+^p:: RecordBotanyPot
+
+^!p:: PreviewBotanyPots
+
+^+p:: ClearBotanyPots
+
 
 s:: KillNextCrusade
 

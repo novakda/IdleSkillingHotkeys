@@ -41,6 +41,9 @@ If the change is relevant for everyone, don't hesitate creating an issue on this
 |`Ctrl + D`|Smithing|Go through all items and craft 1000M items|
 |`Right Arrow`|Botany|Change flower to the next one|
 |`Left Arrow`|Botany|Change flower to the previous one|
+|`Ctrl + P`|Botany|Record the botany pot under the mouse (next number). Saved to BotanyPots.ini|
+|`Ctrl + Alt + P`|Botany|Preview: move the mouse over every recorded pot in order, no clicks|
+|`Ctrl + Shift + P`|Botany|Forget all recorded pots|
 |`S`|Crusade|Defeat a crusade and goes next|
 |`Ctrl + S`|Crusade|Toggle action for the action above (crusade + next)|
 |`R`|Boost|Maybe the most useful one. It resets and boosts your gear|
