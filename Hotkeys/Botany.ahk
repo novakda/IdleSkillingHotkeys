@@ -120,3 +120,73 @@ PreviewBotanyControls()
 	}
 	BotanyTip(shown ? "Preview done" : "No botany controls recorded yet")
 }
+
+
+; ---- Botany replant macro (v1: empty pots only) ----
+; Positions come from the game's 960x544 layout (Qno2x.js scene 36, decoded 2026-10-26):
+; next-plant arrow (647,400), Plant/Harvest button (589,448) 78x38, deselect spot (705,200).
+; The Plant/Harvest button UPROOTS a growing pot and loses its progress, so this only acts on
+; pots whose button shows the empty/Plant frame, read from a pixel on the button. Ready pots
+; are skipped too: harvesting isn't wired in yet. Seed and flower amounts are left alone; the
+; game stores them per pot.
+global BotanyNextPlant := [0.696, 0.772]
+global BotanyGrowButton := [0.654, 0.858]
+global BotanyGrowProbe := [0.624, 0.858]	; a pixel 10px in from the button's left edge
+global BotanyDeselect := [0.734, 0.368]
+; Frame colors sampled from sprite-1133-0.png at that probe point.
+global BotanyFrameColors := Map("empty", 0xD0FFCE, "growing", 0xFB7070, "ready", 0x44F761, "overgrown", 0x53CAFF)
+
+; Returns empty / growing / ready / overgrown, or "unknown" if the probe matches none closely.
+BotanyPotState()
+{
+	CoordMode("Pixel", "Window")
+	WinGetPos(,, &WinWidth, &WinHeight, "ahk_exe IdleSkilling.exe")
+	c := PixelGetColor(BotanyGrowProbe[1] * WinWidth, BotanyGrowProbe[2] * WinHeight)
+	best := "unknown", bestD := 60
+	for name, ref in BotanyFrameColors
+	{
+		d := Abs((c >> 16) - (ref >> 16)) + Abs(((c >> 8) & 0xFF) - ((ref >> 8) & 0xFF)) + Abs((c & 0xFF) - (ref & 0xFF))
+		if (d < bestD)
+			best := name, bestD := d
+	}
+	return best
+}
+
+; dryRun: moves the mouse and reads each pot's state, clicks nothing except selecting pots.
+; Live: for each EMPTY pot, advance to the next plant and plant it. Ctrl+E stops the script.
+BotanyReplantAll(dryRun := true)
+{
+	pots := BotanyPots()
+	if (!pots.Length)
+	{
+		BotanyTip("No botany pots recorded yet (Ctrl+P)")
+		return
+	}
+	if (!dryRun && MsgBox("Plant the next plant in every EMPTY pot?`nGrowing and ready pots are skipped.", "Botany", "YesNo") != "Yes")
+		return
+	report := ""
+	for i, pot in pots
+	{
+		ClickRelative(pot[1], pot[2])
+		Sleep 300
+		state := BotanyPotState()
+		if (state != "empty")
+		{
+			report .= "Pot " i ": " state ", skipped`n"
+			continue
+		}
+		if (dryRun)
+		{
+			report .= "Pot " i ": empty, would advance + plant`n"
+			continue
+		}
+		ClickRelative(BotanyNextPlant[1], BotanyNextPlant[2])
+		Sleep 250
+		ClickRelative(BotanyGrowButton[1], BotanyGrowButton[2])
+		Sleep 400
+		after := BotanyPotState()
+		report .= "Pot " i ": planted, now " after "`n"
+	}
+	ClickRelative(BotanyDeselect[1], BotanyDeselect[2])
+	MsgBox(report, dryRun ? "Botany dry run" : "Botany replant")
+}

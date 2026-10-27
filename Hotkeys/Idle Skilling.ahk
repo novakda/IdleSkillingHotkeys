@@ -50,6 +50,10 @@ Left:: PrevFlower
 
 ^!b:: PreviewBotanyControls
 
+^h:: BotanyReplantAll(true)
+
+^!h:: BotanyReplantAll(false)
+
 
 s:: KillNextCrusade
 

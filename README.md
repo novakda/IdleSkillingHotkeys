@@ -46,6 +46,8 @@ If the change is relevant for everyone, don't hesitate creating an issue on this
 |`Ctrl + Shift + P`|Botany|Forget all recorded pots|
 |`Ctrl + B`|Botany|Record the control under the mouse: pick Harvest, Next/Previous plant, Next/Previous dirt or Plant from the menu|
 |`Ctrl + Alt + B`|Botany|Preview: move the mouse over every recorded control, labelled, no clicks|
+|`Ctrl + H`|Botany|Dry run: select each pot, read whether it is empty/growing/ready, report what it would do. Plants nothing|
+|`Ctrl + Alt + H`|Botany|Replant: for every EMPTY pot, advance to the next plant and plant it. Growing and ready pots are skipped (the Plant button uproots growing pots)|
 |`S`|Crusade|Defeat a crusade and goes next|
 |`Ctrl + S`|Crusade|Toggle action for the action above (crusade + next)|
 |`R`|Boost|Maybe the most useful one. It resets and boosts your gear|
