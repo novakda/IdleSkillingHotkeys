@@ -46,6 +46,10 @@ Left:: PrevFlower
 
 ^+p:: ClearBotanyPots
 
+^b:: RecordBotanyControl
+
+^!b:: PreviewBotanyControls
+
 
 s:: KillNextCrusade
 

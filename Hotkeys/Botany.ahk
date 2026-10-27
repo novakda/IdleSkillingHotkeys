@@ -71,3 +71,52 @@ BotanyTip(text)
 	ToolTip(text)
 	SetTimer(() => ToolTip(), -1200)
 }
+
+
+; ---- Botany controls ----
+; On a pot with nothing to harvest, the plant and dirt controls sit at the bottom of the
+; screen in fixed places. Record each once: hover the control, press the hotkey, pick its
+; name from the menu. Saved to [Controls] in BotanyPots.ini, window-relative like the pots.
+global BotanyControlNames := ["Harvest", "Next plant", "Previous plant", "Next dirt", "Previous dirt", "Plant"]
+
+RecordBotanyControl()
+{
+	WinGetPos(,, &WinWidth, &WinHeight, "ahk_exe IdleSkilling.exe")
+	MouseGetPos(&XMousePos, &YMousePos)
+	xy := Round(XMousePos / WinWidth, 4) "," Round(YMousePos / WinHeight, 4)
+	m := Menu()
+	for name in BotanyControlNames
+		m.Add(name, SaveControl.Bind(name))
+	m.Show()
+
+	SaveControl(name, *)
+	{
+		IniWrite(xy, BotanyPotsFile, "Controls", name)
+		BotanyTip(name " recorded")
+	}
+}
+
+; Returns [X, Y] for a recorded control, or "" if it hasn't been recorded.
+BotanyControl(name)
+{
+	xy := StrSplit(IniRead(BotanyPotsFile, "Controls", name, ""), ",")
+	return xy.Length = 2 ? [xy[1] + 0, xy[2] + 0] : ""
+}
+
+; Moves the mouse over each recorded control, labelled, without clicking.
+PreviewBotanyControls()
+{
+	WinGetPos(,, &WinWidth, &WinHeight, "ahk_exe IdleSkilling.exe")
+	shown := 0
+	for name in BotanyControlNames
+	{
+		c := BotanyControl(name)
+		if (c = "")
+			continue
+		MouseMove(c[1] * WinWidth, c[2] * WinHeight)
+		ToolTip(name)
+		Sleep 800
+		shown++
+	}
+	BotanyTip(shown ? "Preview done" : "No botany controls recorded yet")
+}

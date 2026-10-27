@@ -44,6 +44,8 @@ If the change is relevant for everyone, don't hesitate creating an issue on this
 |`Ctrl + P`|Botany|Record the botany pot under the mouse (next number). Saved to BotanyPots.ini|
 |`Ctrl + Alt + P`|Botany|Preview: move the mouse over every recorded pot in order, no clicks|
 |`Ctrl + Shift + P`|Botany|Forget all recorded pots|
+|`Ctrl + B`|Botany|Record the control under the mouse: pick Harvest, Next/Previous plant, Next/Previous dirt or Plant from the menu|
+|`Ctrl + Alt + B`|Botany|Preview: move the mouse over every recorded control, labelled, no clicks|
 |`S`|Crusade|Defeat a crusade and goes next|
 |`Ctrl + S`|Crusade|Toggle action for the action above (crusade + next)|
 |`R`|Boost|Maybe the most useful one. It resets and boosts your gear|
