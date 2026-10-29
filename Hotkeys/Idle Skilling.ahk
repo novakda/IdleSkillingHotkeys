@@ -53,6 +53,7 @@ Left:: PrevFlower
 ^h:: BotanyReplantAll(true)
 
 ^!h:: BotanyReplantAll(false)
+^!t:: BotanyTestSlots()	; click every plant slot with pot 1 selected (selection only, no Grow)
 
 ^g:: BotanyCollectAndReplant(true)
 

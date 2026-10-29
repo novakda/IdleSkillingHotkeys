@@ -453,3 +453,31 @@ BotanyPrefill(dirtPct := 1, flowerPct := 1, dryRun := true)
 		MsgBox("Stopped: " e.Message, title)
 	}
 }
+
+; Test the plant slots: select pot 1, then click each sidebar slot 1-24 in turn (1.5 s apart) and tooltip which one.
+; Selecting a plant only changes what the pot will grow next; nothing is planted (no Grow click). Ctrl+E stops.
+BotanyTestSlots()
+{
+	try
+	{
+		pots := BotanyPots()
+		if (!pots.Length)
+			throw Error("no pots recorded")
+		BotanyDo(BotanyFrac(pots[1]), "pot 1", false, 600)
+		Loop BotanySlotCount
+		{
+			try xy := BotanyPoint("Slot " A_Index)
+			catch
+			{
+				BotanyTip("Slot " A_Index ": no position, skipped")
+				Sleep 800
+				continue
+			}
+			ToolTip("Slot " A_Index)
+			BotanyDo(xy, "slot " A_Index, false, 1500)
+		}
+		BotanyTip("Slot test done")
+	}
+	catch as e
+		BotanyTip("Slot test stopped: " e.Message)
+}
