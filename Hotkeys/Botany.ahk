@@ -596,7 +596,7 @@ BotanyTestSlots()
 ; which runs the game's per-pot Grow (plant or harvest, by each pot's state) using whatever is set. ----
 
 ; Loop 1: on every pot, pick the plant: slot 0 = the Next plant arrow, N = sidebar slot N (plant N). No Grow.
-BotanySetPlants(slot := 0, dryRun := true)
+BotanySetPlants(slot := 0, dryRun := true, quiet := false)
 {
 	title := dryRun ? "Set plants (dry run)" : "Set plants"
 	if (slot = -1)
@@ -610,7 +610,7 @@ BotanySetPlants(slot := 0, dryRun := true)
 	if (!pots.Length)
 		return BotanyTip("No botany pots recorded yet (Ctrl+P)")
 	pick := slot ? "Slot " slot : "Next plant"
-	if (!dryRun && MsgBox("Set every pot to " (slot ? "plant " slot : "its next plant") "? (no Grow)", title, "YesNo") != "Yes")
+	if (!dryRun && !quiet && MsgBox("Set every pot to " (slot ? "plant " slot : "its next plant") "? (no Grow)", title, "YesNo") != "Yes")
 		return
 	WinActivate(BotanyGame)
 	Sleep 200
@@ -637,15 +637,15 @@ BotanySetPlants(slot := 0, dryRun := true)
 
 ; Loop 2: on every pot, set dirt (and the prior-plant seed, except for weeds: plant 1 has none) by the prefill
 ; steps: max (25%), down x BotanyPrefillDowns, interval (1%), up pct times. Plants per pot come from one CDP read.
-BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true)
+BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true, quiet := false, plantAll := 0)
 {
 	title := dryRun ? "Set dirt/seed (dry run)" : "Set dirt/seed"
 	pots := BotanyPots()
 	if (!pots.Length)
 		return BotanyTip("No botany pots recorded yet (Ctrl+P)")
-	if (!dryRun && MsgBox("Set every pot to " dirtPct "% dirt and " flowerPct "% seed (dirt only on weeds)?", title, "YesNo") != "Yes")
+	if (!dryRun && !quiet && MsgBox("Set every pot to " dirtPct "% dirt and " flowerPct "% seed (dirt only on weeds)?", title, "YesNo") != "Yes")
 		return
-	sel := BotanySelArray()
+	sel := plantAll ? "" : BotanySelArray()
 	WinActivate(BotanyGame)
 	Sleep 200
 	try
@@ -657,7 +657,7 @@ BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true)
 		for i, pot in pots
 		{
 			BotanyDo(BotanyFrac(pot), "pot " i, false, 300)
-			plant := (IsObject(sel) && i + 1 <= sel.Length) ? sel[i + 1] : 0
+			plant := plantAll ? plantAll : (IsObject(sel) && i + 1 <= sel.Length) ? sel[i + 1] : 0
 			steps := plant = 1 ? Map("Dirt", dirtPct) : Map("Dirt", dirtPct, "Flower", flowerPct)
 			for field, pct in steps
 			{
@@ -681,7 +681,7 @@ BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true)
 }
 
 ; Step 3: deselect (shows Grow All), press it, wait until the game's per-pot loop has finished, report.
-BotanyGrowAllNow(dryRun := true)
+BotanyGrowAllNow(dryRun := true, noReport := false)
 {
 	title := dryRun ? "Grow All (dry run)" : "Grow All"
 	before := BotanyLiveState()
@@ -691,7 +691,7 @@ BotanyGrowAllNow(dryRun := true)
 	{
 		BotanyDo(BotanyPoint("Blank area"), "blank area (shows Grow All)", dryRun)
 		BotanyDo(BotanyPoint("Grow All"), "Grow All", dryRun, 800)
-		if (dryRun || !IsObject(before))
+		if (dryRun || !IsObject(before) || noReport)
 			return BotanyTip(dryRun ? "Grow All dry run done" : "Grow All pressed")
 		; Every pot flips state (empty -> planted, planted -> empty); wait for all of them.
 		was := []
@@ -743,4 +743,52 @@ BotanySelArray()
 	for v in StrSplit(m[1], ",")
 		sel.Push(IsNumber(v) ? v + 0 : 0)
 	return sel
+}
+
+; ---- Dan's routine (2026-10-29): every pot grows the same plant. On each visit: harvest everything, move every pot
+; to the NEXT owned plant (after the last one, back to weeds), set 1% dirt + 1% seed, Grow All. Keeps seed for the
+; next plant in stock over time. Uses sidebar slots (slot N = plant N), so unowned plants are skipped. ----
+BotanyAdvance(dryRun := true, dirtPct := 1, flowerPct := 1)
+{
+	title := dryRun ? "Advance botany (dry run)" : "Advance botany"
+	live := BotanyLiveState(), sel := BotanySelArray(), owned := BotanyOwned()
+	if (!IsObject(live) || !IsObject(sel) || !IsObject(owned))
+		return MsgBox("Needs the debug connection (start the game with the 'Idle Skilling (debug)' shortcut).", title)
+	; The plant now: what pot 1 is planted with (or set to, if empty).
+	cur := live[1].plant ? live[1].plant : (sel.Length >= 2 ? sel[2] : 1)
+	nxt := 1	; wrap to weeds
+	Loop BotanySlotCount
+		if (A_Index > cur && A_Index + 1 <= owned.Length && owned[A_Index + 1] > 0)
+		{
+			nxt := A_Index
+			break
+		}
+	early := 0, planted := 0
+	for p in live
+		early += (p.state = "growing"), planted += (p.state != "empty")
+	msg := "Harvest " planted " pot(s), then plant " nxt (nxt = 1 ? " (weeds: back to the start)" : "") " in every pot with "
+		. dirtPct "% dirt" (nxt = 1 ? "" : " + " flowerPct "% seed") "?"
+	if (early)
+		msg .= "`n`n" early " pot(s) haven't finished a growth cycle and would yield nothing."
+	if (!dryRun && MsgBox(msg, title, "YesNo" (early ? " Icon!" : "")) != "Yes")
+		return
+	if (dryRun)
+		BotanyTip("Plant now " cur ", next " nxt)
+	; 1. harvest (Grow All on planted pots), wait until all are empty
+	if (planted)
+	{
+		BotanyGrowAllNow(dryRun, true)
+		if (!dryRun)
+		{
+			st := BotanyWaitPots((p) => p.state = "empty", 60000)
+			if (IsObject(st))
+				for p in st
+					if (p.state != "empty")
+						return MsgBox("Harvest didn't empty every pot within 60 s; stopped.", title)
+		}
+	}
+	; 2. every pot -> plant nxt, 3. dirt/seed, 4. Grow All to plant
+	BotanySetPlants(nxt, dryRun, true)
+	BotanyPrefillAll(dirtPct, flowerPct, dryRun, true, nxt)
+	BotanyGrowAllNow(dryRun)
 }

@@ -57,9 +57,11 @@ Left:: PrevFlower
 ^!a:: BotanyGrowAllNow(false)	; Grow All: the game plants or harvests each pot by its state, then a report
 ^!t:: BotanyTestSlots()	; click every plant slot with pot 1 selected (selection only, no Grow)
 
-^g:: BotanySetPlants(0, true)	; every pot: next plant (dry run)
+^g:: BotanyAdvance(true)	; ROUTINE (dry run): harvest, every pot to the next owned plant (wraps to weeds), 1% dirt+seed, Grow All
 
-^!g:: BotanySetPlants(0, false)	; every pot: next plant
+^!g:: BotanyAdvance(false)	; ROUTINE
+^j:: BotanySetPlants(0, true)	; every pot: Next plant arrow only (dry run)
+^!j:: BotanySetPlants(0, false)
 
 ^f:: BotanySetPlants(-1, true)	; every pot: plant N from the sidebar (asks N; dry run)
 
