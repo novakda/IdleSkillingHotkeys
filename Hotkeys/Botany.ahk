@@ -334,6 +334,30 @@ BotanyOwned()
 	return owned
 }
 
+; Polls pot states over CDP until every pot satisfies ok(pot) or timeoutMs passes; returns the last read
+; ("" when CDP is down: then it just waits a fixed 1 s per pot, since Grow All goes pot by pot).
+BotanyWaitPots(ok, timeoutMs)
+{
+	start := A_TickCount
+	loop
+	{
+		st := BotanyLiveState()
+		if (!IsObject(st))
+		{
+			Sleep 1000 * BotanyPots().Length
+			return ""
+		}
+		done := true
+		for p in st
+			if (!ok(p))
+				done := false
+		if (done || A_TickCount - start > timeoutMs)
+			return st
+		ToolTip("Waiting for Grow All to finish...")
+		Sleep 500
+	}
+}
+
 ; The plant the selected pot is set to grow (FlowerTypeSELECTED[PotSelected]) over CDP, or 0 if unknown.
 BotanySelectedPlant()
 {
@@ -429,7 +453,8 @@ BotanyRun(collect, slot, dryRun)
 		}
 		; One CDP read for every pot's state (after Grow All has collected); the per-pot pixel check
 		; (~190 pixel reads, seconds per pot) is only the fallback when the debug connection is down.
-		now := (collect && !dryRun) ? BotanyLiveState() : live
+		; Grow All works through the pots one at a time (Dan), so wait until it has finished harvesting.
+		now := (collect && !dryRun) ? BotanyWaitPots((p) => p.state != "ready", 60000) : live
 		for i, pot in pots
 		{
 			BotanyDo(BotanyFrac(pot), "pot " i, false, 250)
@@ -464,6 +489,8 @@ BotanyRun(collect, slot, dryRun)
 		{
 			BotanyDo(blankXY, "blank area (shows Grow All)", dryRun)
 			BotanyDo(allXY, "Grow All (plants every pot)", dryRun, 1000)
+			if (!dryRun)
+				BotanyWaitPots((p) => p.state != "empty", 60000)
 		}
 	}
 	catch Error as e
