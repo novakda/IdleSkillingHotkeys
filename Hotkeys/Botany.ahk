@@ -73,11 +73,16 @@ BotanyTip(text)
 }
 
 
+
 ; ---- Botany controls ----
-; On a pot with nothing to harvest, the plant and dirt controls sit at the bottom of the
-; screen in fixed places. Record each once: hover the control, press the hotkey, pick its
-; name from the menu. Saved to [Controls] in BotanyPots.ini, window-relative like the pots.
-global BotanyControlNames := ["Harvest", "Next plant", "Previous plant", "Next dirt", "Previous dirt", "Plant"]
+; Record each once: hover the control, press Ctrl+B, pick its name from the menu (sidebar plant icons are under
+; "Plant slot"). Saved to [Controls] in BotanyPots.ini, window-relative like the pots. Grow, Next plant and Blank area
+; fall back to the decoded game layout below when not recorded; every other control must be recorded before a macro
+; uses it (a macro stops before its first click if one is missing). The Grow / plant / Dirt / Flower controls only
+; show on a selected EMPTY pot, so record them with one selected.
+global BotanyControlNames := ["Blank area", "Grow All", "Grow", "Next plant", "Previous plant", "Next dirt", "Previous dirt"
+	, "Dirt max", "Dirt down", "Dirt interval", "Dirt up", "Flower max", "Flower down", "Flower interval", "Flower up"]
+global BotanySlotCount := 12	; right-sidebar plant slots offered in the record menu
 
 RecordBotanyControl()
 {
@@ -87,6 +92,10 @@ RecordBotanyControl()
 	m := Menu()
 	for name in BotanyControlNames
 		m.Add(name, SaveControl.Bind(name))
+	slots := Menu()
+	Loop BotanySlotCount
+		slots.Add("Slot " A_Index, SaveSlot.Bind(A_Index))
+	m.Add("Plant slot (right sidebar)", slots)
 	m.Show()
 
 	SaveControl(name, *)
@@ -94,27 +103,48 @@ RecordBotanyControl()
 		IniWrite(xy, BotanyPotsFile, "Controls", name)
 		BotanyTip(name " recorded")
 	}
+
+	; A slot also stores its pixel colour, sampled with the mouse moved off it (in case of hover effects), so the
+	; macros can tell later whether that icon is still there.
+	SaveSlot(n, *)
+	{
+		MouseGetPos(&mx, &my)
+		away := BotanyPoint("Blank area")
+		MouseMove(away[1], away[2], 0)
+		Sleep 200
+		CoordMode("Pixel", "Window")
+		color := PixelGetColor(XMousePos, YMousePos)
+		MouseMove(mx, my, 0)
+		IniWrite(xy "," color, BotanyPotsFile, "Controls", "Slot " n)
+		BotanyTip("Slot " n " recorded (" color ")")
+	}
 }
 
-; Returns [X, Y] for a recorded control, or "" if it hasn't been recorded.
+; Returns [X, Y] (plus the recorded colour, for a slot) for a recorded control, or "" if it hasn't been recorded.
 BotanyControl(name)
 {
-	xy := StrSplit(IniRead(BotanyPotsFile, "Controls", name, ""), ",")
-	return xy.Length = 2 ? [xy[1] + 0, xy[2] + 0] : ""
+	v := StrSplit(IniRead(BotanyPotsFile, "Controls", name, ""), ",")
+	if (v.Length < 2)
+		return ""
+	for i, x in v
+		v[i] := x + 0
+	return v
 }
 
-; Moves the mouse over each recorded control, labelled, without clicking.
+; Moves the mouse over each control a macro would use (recorded or layout default) and each recorded slot, labelled, without clicking.
 PreviewBotanyControls()
 {
-	WinGetPos(,, &WinWidth, &WinHeight, "ahk_exe IdleSkilling.exe")
+	names := BotanyControlNames.Clone()
+	Loop BotanySlotCount
+		names.Push("Slot " A_Index)
 	shown := 0
-	for name in BotanyControlNames
+	for name in names
 	{
-		c := BotanyControl(name)
-		if (c = "")
+		try p := BotanyPoint(name)
+		catch
 			continue
-		MouseMove(c[1] * WinWidth, c[2] * WinHeight)
-		ToolTip(name)
+		MouseMove(p[1], p[2])
+		ToolTip(name (IsObject(BotanyControl(name)) ? "" : " (layout default)"))
 		Sleep 800
 		shown++
 	}
@@ -122,16 +152,15 @@ PreviewBotanyControls()
 }
 
 
-; ---- Botany replant macro (v1: empty pots only) ----
+; ---- Game layout, pixel state and click helpers ----
 ; Positions are the game's own 960x544 layout (Qno2x.js scene 36, decoded 2026-10-26). The
 ; game window draws its own title bar ABOVE that layout (~29px at 958x572), so layout points
 ; are converted with BotanyWin(), which scales to the window width and adds the bar height.
-; The Plant/Harvest button UPROOTS a growing pot and loses its progress, so this only acts on
-; pots whose button shows the empty/Plant frame. Ready pots are skipped too: harvesting isn't
-; wired in yet. Seed and flower amounts are left alone; the game stores them per pot.
 global BotanyNextPlant := [668, 420]	; next-plant arrow center (box 647,400 43x40)
 global BotanyGrowButton := [628, 467]	; Plant/Harvest button center (box 589,448 78x38)
 global BotanyDeselect := [705, 200]	; empty spot that deselects the pot
+global BotanyLayoutDefaults := Map("Grow", BotanyGrowButton, "Next plant", BotanyNextPlant, "Blank area", BotanyDeselect)
+global BotanyGame := "Idle Skilling ahk_exe IdleSkilling.exe"
 
 ; Game layout point -> window point, as [X, Y].
 BotanyWin(pt)
@@ -141,10 +170,39 @@ BotanyWin(pt)
 	return [Round(pt[1] * s), Round(WinHeight - 544 * s + pt[2] * s)]
 }
 
-BotanyClick(pt)
+; Window-relative fraction [0..1, 0..1] -> window point, as [X, Y].
+BotanyFrac(f)
 {
-	w := BotanyWin(pt)
-	ClickAny(w[1], w[2], 1)
+	WinGetPos(,, &WinWidth, &WinHeight, "ahk_exe IdleSkilling.exe")
+	return [Round(f[1] * WinWidth), Round(f[2] * WinHeight)]
+}
+
+; Window point for a named control: its recording, else the layout default, else an error.
+BotanyPoint(name)
+{
+	c := BotanyControl(name)
+	if (IsObject(c))
+		return BotanyFrac(c)
+	if (BotanyLayoutDefaults.Has(name))
+		return BotanyWin(BotanyLayoutDefaults[name])
+	throw Error("'" name "' is not recorded yet (Ctrl+B)")
+}
+
+; Clicks window point xy, then waits for the game's UI. Dry run: moves the mouse there with a label instead.
+; Throws when the game isn't the active window, so a macro never clicks into something else.
+BotanyDo(xy, label, dryRun, wait := 300)
+{
+	if (!WinActive(BotanyGame))
+		throw Error("Idle Skilling is not the active window (before: " label ")")
+	if (dryRun)
+	{
+		MouseMove(xy[1], xy[2])
+		ToolTip("would click: " label)
+		Sleep 700
+		return
+	}
+	ClickAny(xy[1], xy[2], 1)
+	Sleep wait
 }
 
 ; Reads the Plant/Harvest button's frame by voting over a patch of pixels around it, so the
@@ -188,40 +246,172 @@ BotanyPotState()
 	return best
 }
 
-; dryRun: selects each pot and reads its state; plants nothing.
-; Live: for each EMPTY pot, advance to the next plant and plant it. Ctrl+E stops the script.
-BotanyReplantAll(dryRun := true)
+; True if sidebar slot n still shows the icon it had when recorded (each colour channel within the tolerance).
+; ponytail: one pixel vs the recorded colour; if two plants match at that pixel, check FlowerTypeSELECTED over CDP instead.
+global BotanySlotTolerance := 40
+BotanySlotPresent(n)
+{
+	c := BotanyControl("Slot " n)
+	if (!IsObject(c) || c.Length < 3)
+		throw Error("Slot " n " is not recorded yet (Ctrl+B > Plant slot)")
+	p := BotanyFrac(c)
+	CoordMode("Pixel", "Window")
+	px := PixelGetColor(p[1], p[2])
+	d := 0
+	for s in [16, 8, 0]
+		d := Max(d, Abs(((px >> s) & 0xFF) - ((c[3] >> s) & 0xFF)))
+	return d <= BotanySlotTolerance
+}
+
+; Pot states over CDP from the toolbox helper (bun src/botany-state.ts, in WSL): an array by pot number of
+; {plant, state} (state empty / growing / ready), or "" when it can't be read (game not started from the
+; "Idle Skilling (debug)" shortcut, WSL not up, ...). Read-only. Used to skip runs with nothing to do and as a
+; second opinion; the pixel check still gates every Grow click.
+global BotanyStateCmd := 'wsl.exe -e bash -lc "cd ~/projects/idle-skilling-toolbox && bun src/botany-state.ts"'
+BotanyLiveState()
+{
+	out := A_Temp "\botany-state.json"
+	try FileDelete(out)
+	try
+	{
+		RunWait(A_ComSpec ' /c ' BotanyStateCmd ' > "' out '" 2>nul',, "Hide")
+		json := FileRead(out)
+	}
+	catch
+		return ""
+	pots := [], pos := 1
+	while (pos := RegExMatch(json, '"plant":(\d+),"state":"(\w+)"', &m, pos))
+		pots.Push({plant: m[1] + 0, state: m[2]}), pos += m.Len
+	return pots.Length ? pots : ""
+}
+
+
+; ---- Botany macros ----
+; Ctrl+E stops any of them (it exits the script).
+BotanyReplantAll(dryRun := true) => BotanyRun(false, 0, dryRun)		; empty pots: next plant
+BotanyCollectAndReplant(dryRun := true) => BotanyRun(true, 0, dryRun)	; Scenario 1: Grow All, then next plant
+
+; Scenario 2: Grow All, then plant sidebar slot `slot` (asks which when 0).
+BotanyCollectAndPlant(slot := 0, dryRun := true)
+{
+	if (!slot)
+	{
+		r := InputBox("Sidebar plant slot to plant (1-" BotanySlotCount "):", "Botany", "w260 h110", 1)
+		if (r.Result != "OK" || !IsInteger(r.Value) || r.Value < 1 || r.Value > BotanySlotCount)
+			return
+		slot := r.Value + 0
+	}
+	BotanyRun(true, slot, dryRun)
+}
+
+; One pass over the recorded pots, in order.
+; collect: first click the blank area (deselects the pot, shows Grow All) and Grow All.
+; slot: 0 = the Next plant arrow (next plant in order; seed/flower amounts unchanged), N = sidebar plant slot N.
+; The Grow button UPROOTS a growing pot, so a pot is planted only when its button reads EMPTY at that moment.
+; Dry run: selects each pot to read it (harmless, as before) but only points at every other click.
+BotanyRun(collect, slot, dryRun)
 {
 	pots := BotanyPots()
 	if (!pots.Length)
+		return BotanyTip("No botany pots recorded yet (Ctrl+P)")
+	title := dryRun ? "Botany dry run" : "Botany"
+	pick := slot ? "Slot " slot : "Next plant"
+	live := BotanyLiveState()
+	if (IsObject(live))
 	{
-		BotanyTip("No botany pots recorded yet (Ctrl+P)")
-		return
+		empty := 0, ready := 0
+		for p in live
+			empty += (p.state = "empty"), ready += (p.state = "ready")
+		if (!empty && !(collect && ready))
+			return MsgBox("Nothing to do: no pot is empty" (collect ? " or ready" : "") " (read over CDP).", title)
 	}
-	if (!dryRun && MsgBox("Plant the next plant in every EMPTY pot?`nGrowing and ready pots are skipped.", "Botany", "YesNo") != "Yes")
+	what := (collect ? "Collect all (Grow All), then plant " : "Plant ") (slot ? "sidebar slot " slot : "the next plant") " in every EMPTY pot?"
+	if (!dryRun && MsgBox(what "`nGrowing pots are skipped. Ctrl+E stops.", title, "YesNo") != "Yes")
 		return
-	report := ""
-	for i, pot in pots
+	WinActivate(BotanyGame)
+	Sleep 200
+	report := IsObject(live) ? "" : "(CDP state unavailable: pixel check only)`n"
+	try
 	{
-		ClickRelative(pot[1], pot[2])
-		Sleep 400
-		state := BotanyPotState()
-		if (state != "empty")
+		; Resolve every point first, so a missing recording stops before the first click.
+		pickXY := BotanyPoint(pick), growXY := BotanyPoint("Grow")
+		if (collect)
 		{
-			report .= "Pot " i ": " state ", skipped`n"
-			continue
+			blankXY := BotanyPoint("Blank area"), allXY := BotanyPoint("Grow All")
+			BotanyDo(blankXY, "blank area (shows Grow All)", dryRun)
+			BotanyDo(allXY, "Grow All", dryRun, 1500)
 		}
-		if (dryRun)
+		for i, pot in pots
 		{
-			report .= "Pot " i ": empty, would advance + plant`n"
-			continue
+			BotanyDo(BotanyFrac(pot), "pot " i, false, 400)
+			state := BotanyPotState()
+			if (state = "unknown")
+				throw Error("can't read pot " i "'s button (Botany screen open? pot positions right?)")
+			willCollect := dryRun && collect && (state = "ready" || state = "overgrown")
+			if (state != "empty" && !willCollect)
+			{
+				report .= "Pot " i ": " state ", skipped`n"
+				continue
+			}
+			if (!collect && IsObject(live) && i <= live.Length && live[i].state != "empty")
+			{
+				report .= "Pot " i ": CDP says " live[i].state ", skipped`n"
+				continue
+			}
+			if (slot && !BotanySlotPresent(slot))
+				throw Error("sidebar slot " slot " doesn't show its plant (none owned, or the sidebar moved)")
+			BotanyDo(pickXY, pick, dryRun, 250)
+			BotanyDo(growXY, "Grow", dryRun, 500)
+			report .= "Pot " i ": " (dryRun ? state (willCollect ? " (Grow All would collect it)" : "") ", would plant" : "planted, now " BotanyPotState()) "`n"
 		}
-		BotanyClick(BotanyNextPlant)
-		Sleep 250
-		BotanyClick(BotanyGrowButton)
-		Sleep 500
-		report .= "Pot " i ": planted, now " BotanyPotState() "`n"
 	}
-	BotanyClick(BotanyDeselect)
-	MsgBox(report, dryRun ? "Botany dry run" : "Botany replant")
+	catch Error as e
+		report .= "STOPPED: " e.Message "`n"
+	ToolTip()
+	try BotanyDo(BotanyPoint("Blank area"), "deselect", false, 200)
+	if (!dryRun && IsObject(after := BotanyLiveState()))
+	{
+		report .= "Plant per pot now (CDP):"
+		for p in after
+			report .= " " p.plant
+	}
+	MsgBox(report, title)
+}
+
+; PREFILL PLANTS AND SEEDS on the selected EMPTY pot: for Dirt, then Flower (the previous plant): Max (25%),
+; Down x BotanyPrefillDowns, pick the interval, then Up pct/interval times. Dan uses 1% of each.
+global BotanyPrefillStep := 1		; % per Up click at the recorded interval
+global BotanyPrefillDowns := 4	; Down clicks after Max
+BotanyPrefill(dirtPct := 1, flowerPct := 1, dryRun := true)
+{
+	title := dryRun ? "Botany prefill dry run" : "Botany prefill"
+	if (!dryRun && MsgBox("Set dirt to " dirtPct "% and flowers to " flowerPct "% on the selected pot?", title, "YesNo") != "Yes")
+		return
+	WinActivate(BotanyGame)
+	Sleep 200
+	try
+	{
+		pts := Map()
+		for field in ["Dirt", "Flower"]
+			for c in ["max", "down", "interval", "up"]
+				pts[field " " c] := BotanyPoint(field " " c)
+		if (BotanyPotState() != "empty")
+			throw Error("select an EMPTY pot first (the amount controls only show there)")
+		for field, pct in Map("Dirt", dirtPct, "Flower", flowerPct)
+		{
+			BotanyDo(pts[field " max"], field " max", dryRun)
+			Loop BotanyPrefillDowns
+				BotanyDo(pts[field " down"], field " down " A_Index, dryRun, 150)
+			BotanyDo(pts[field " interval"], field " interval", dryRun)
+			Loop Round(pct / BotanyPrefillStep)
+				BotanyDo(pts[field " up"], field " up " A_Index, dryRun, 150)
+		}
+		ToolTip()
+		BotanyTip(dryRun ? "Prefill dry run done" : "Prefilled")
+	}
+	catch Error as e
+	{
+		ToolTip()
+		MsgBox("Stopped: " e.Message, title)
+	}
 }

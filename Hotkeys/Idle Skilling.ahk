@@ -54,6 +54,18 @@ Left:: PrevFlower
 
 ^!h:: BotanyReplantAll(false)
 
+^g:: BotanyCollectAndReplant(true)
+
+^!g:: BotanyCollectAndReplant(false)
+
+^f:: BotanyCollectAndPlant(0, true)
+
+^!f:: BotanyCollectAndPlant(0, false)
+
+^l:: BotanyPrefill(1, 1, true)
+
+^!l:: BotanyPrefill(1, 1, false)
+
 
 s:: KillNextCrusade
 
