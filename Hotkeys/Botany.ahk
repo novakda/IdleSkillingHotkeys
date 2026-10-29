@@ -450,8 +450,20 @@ BotanyRun(collect, slot, dryRun)
 			if (slot && !BotanySlotPresent(slot))
 				throw Error("sidebar slot " slot " doesn't show its plant (none owned, or the sidebar moved)")
 			BotanyDo(pickXY, pick, dryRun, 250)
-			BotanyDo(growXY, "Grow", dryRun, 100)	; Dan: after Grow, move straight on
-			report .= "Pot " i ": " (dryRun ? state (willCollect ? " (Grow All would collect it)" : "") ", would plant" : "planted") "`n"
+			if (collect)	; set only; the second Grow All below plants every pot at once
+				report .= "Pot " i ": " (dryRun ? state (willCollect ? " (Grow All would collect it)" : "") ", would set" : "set") "`n"
+			else
+			{
+				BotanyDo(growXY, "Grow", dryRun, 100)	; Dan: after Grow, move straight on
+				report .= "Pot " i ": " (dryRun ? state ", would plant" : "planted") "`n"
+			}
+		}
+		; Grow All harvests when pots are ready and plants when they're empty (Dan, 2026-10-29), so a second
+		; press plants every pot with what it was just set to.
+		if (collect)
+		{
+			BotanyDo(blankXY, "blank area (shows Grow All)", dryRun)
+			BotanyDo(allXY, "Grow All (plants every pot)", dryRun, 1000)
 		}
 	}
 	catch Error as e
