@@ -287,6 +287,11 @@ BotanyPotState()
 global BotanySlotTolerance := 40
 BotanySlotPresent(n)
 {
+	; Slot n is plant n at a fixed spot (unowned plants leave a gap; slot test 2026-10-29), so the game's own count
+	; answers this when the debug connection is up. Pixel colour is the fallback.
+	owned := BotanyOwned()
+	if (IsObject(owned))
+		return n + 1 <= owned.Length && owned[n + 1] > 0
 	c := BotanyControl("Slot " n)
 	if (!IsObject(c))
 		throw Error("Slot " n " is not recorded, and the grid can't place it yet (record one slot in its column)")
@@ -305,6 +310,30 @@ BotanySlotPresent(n)
 ; {plant, state} (state empty / growing / ready), or "" when it can't be read (game not started from the
 ; "Idle Skilling (debug)" shortcut, WSL not up, ...). Read-only. Used to skip runs with nothing to do and as a
 ; second opinion; the pixel check still gates every Grow click.
+; flowersOwned over CDP (index 0 = plant 0, so plant n is element n + 1), or "" when it can't be read.
+BotanyOwned()
+{
+	static cache := "", at := 0
+	if (IsObject(cache) && A_TickCount - at < 30000)	; one read per run, not one per pot
+		return cache
+	out := A_Temp "\botany-owned.json"
+	try FileDelete(out)
+	try
+	{
+		RunWait(A_ComSpec ' /c ' BotanyStateCmd ' > "' out '" 2>nul',, "Hide")
+		json := FileRead(out)
+	}
+	catch
+		return ""
+	if (!RegExMatch(json, '"owned":\[([^\]]*)\]', &m))
+		return ""
+	owned := []
+	for v in StrSplit(m[1], ",")
+		owned.Push(IsNumber(v) ? v + 0 : 0)
+	cache := owned, at := A_TickCount
+	return owned
+}
+
 global BotanyStateCmd := 'wsl.exe -e bash -lc "cd ~/projects/idle-skilling-toolbox && bun src/botany-state.ts"'
 BotanyLiveState()
 {
