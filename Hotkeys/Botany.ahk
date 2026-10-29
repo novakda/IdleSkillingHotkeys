@@ -334,6 +334,25 @@ BotanyOwned()
 	return owned
 }
 
+; The plant the selected pot is set to grow (FlowerTypeSELECTED[PotSelected]) over CDP, or 0 if unknown.
+BotanySelectedPlant()
+{
+	out := A_Temp "\botany-sel.json"
+	try FileDelete(out)
+	try
+	{
+		RunWait(A_ComSpec ' /c ' BotanyStateCmd ' > "' out '" 2>nul',, "Hide")
+		json := FileRead(out)
+	}
+	catch
+		return 0
+	if (!RegExMatch(json, '"selectedPot":(\d+)', &p) || !RegExMatch(json, '"sel":\[([^\]]*)\]', &m))
+		return 0
+	sel := StrSplit(m[1], ",")
+	n := p[1] + 1
+	return n <= sel.Length && IsNumber(sel[n]) ? sel[n] + 0 : 0
+}
+
 global BotanyStateCmd := 'wsl.exe -e bash -lc "cd ~/projects/idle-skilling-toolbox && bun src/botany-state.ts"'
 BotanyLiveState()
 {
@@ -464,7 +483,12 @@ BotanyPrefill(dirtPct := 1, flowerPct := 1, dryRun := true)
 				pts[field " " c] := BotanyPoint(field " " c)
 		if (BotanyPotState() != "empty")
 			throw Error("select an EMPTY pot first (the amount controls only show there)")
-		for field, pct in Map("Dirt", dirtPct, "Flower", flowerPct)
+		; Weeds (plant 1) have no prior plant, so there is no flower selector: dirt only. Unknown (no CDP): both.
+		plant := BotanySelectedPlant()
+		steps := plant = 1 ? Map("Dirt", dirtPct) : Map("Dirt", dirtPct, "Flower", flowerPct)
+		if (plant = 1)
+			BotanyTip("Weeds selected: dirt only")
+		for field, pct in steps
 		{
 			BotanyDo(pts[field " max"], field " max", dryRun)
 			Loop BotanyPrefillDowns
