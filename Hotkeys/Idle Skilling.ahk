@@ -53,19 +53,21 @@ Left:: PrevFlower
 ^h:: BotanyReplantAll(true)
 
 ^!h:: BotanyReplantAll(false)
+^a:: BotanyGrowAllNow(true)	; Grow All (dry run)
+^!a:: BotanyGrowAllNow(false)	; Grow All: the game plants or harvests each pot by its state, then a report
 ^!t:: BotanyTestSlots()	; click every plant slot with pot 1 selected (selection only, no Grow)
 
-^g:: BotanyCollectAndReplant(true)
+^g:: BotanySetPlants(0, true)	; every pot: next plant (dry run)
 
-^!g:: BotanyCollectAndReplant(false)
+^!g:: BotanySetPlants(0, false)	; every pot: next plant
 
-^f:: BotanyCollectAndPlant(0, true)
+^f:: BotanySetPlants(-1, true)	; every pot: plant N from the sidebar (asks N; dry run)
 
-^!f:: BotanyCollectAndPlant(0, false)
+^!f:: BotanySetPlants(-1, false)
 
-^l:: BotanyPrefill(1, 1, true)
+^l:: BotanyPrefillAll(1, 1, true)	; every pot: 1% dirt + 1% seed (dirt only on weeds; dry run)
 
-^!l:: BotanyPrefill(1, 1, false)
+^!l:: BotanyPrefillAll(1, 1, false)
 
 
 s:: KillNextCrusade

@@ -591,3 +591,156 @@ BotanyTestSlots()
 	catch as e
 		BotanyTip("Slot test stopped: " e.Message)
 }
+
+; ---- Separate loops (Dan, 2026-10-29): set each pot's plant, then each pot's dirt/seed, then press Grow All,
+; which runs the game's per-pot Grow (plant or harvest, by each pot's state) using whatever is set. ----
+
+; Loop 1: on every pot, pick the plant: slot 0 = the Next plant arrow, N = sidebar slot N (plant N). No Grow.
+BotanySetPlants(slot := 0, dryRun := true)
+{
+	title := dryRun ? "Set plants (dry run)" : "Set plants"
+	if (slot = -1)
+	{
+		r := InputBox("Sidebar plant slot = plant number (1-" BotanySlotCount "):", title, "w260 h110", 1)
+		if (r.Result != "OK" || !IsInteger(r.Value) || r.Value < 1 || r.Value > BotanySlotCount)
+			return
+		slot := r.Value + 0
+	}
+	pots := BotanyPots()
+	if (!pots.Length)
+		return BotanyTip("No botany pots recorded yet (Ctrl+P)")
+	pick := slot ? "Slot " slot : "Next plant"
+	if (!dryRun && MsgBox("Set every pot to " (slot ? "plant " slot : "its next plant") "? (no Grow)", title, "YesNo") != "Yes")
+		return
+	WinActivate(BotanyGame)
+	Sleep 200
+	try
+	{
+		xy := BotanyPoint(pick)
+		if (slot && !BotanySlotPresent(slot))
+			throw Error("plant " slot " isn't owned (no icon in its sidebar slot)")
+		for i, pot in pots
+		{
+			BotanyDo(BotanyFrac(pot), "pot " i, false, 250)
+			BotanyDo(xy, pick " on pot " i, dryRun, 150)
+		}
+		BotanyDo(BotanyPoint("Blank area"), "deselect", false, 200)
+		ToolTip()
+		BotanyTip(dryRun ? "Set plants dry run done" : "Every pot set")
+	}
+	catch Error as e
+	{
+		ToolTip()
+		MsgBox("Stopped: " e.Message, title)
+	}
+}
+
+; Loop 2: on every pot, set dirt (and the prior-plant seed, except for weeds: plant 1 has none) by the prefill
+; steps: max (25%), down x BotanyPrefillDowns, interval (1%), up pct times. Plants per pot come from one CDP read.
+BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true)
+{
+	title := dryRun ? "Set dirt/seed (dry run)" : "Set dirt/seed"
+	pots := BotanyPots()
+	if (!pots.Length)
+		return BotanyTip("No botany pots recorded yet (Ctrl+P)")
+	if (!dryRun && MsgBox("Set every pot to " dirtPct "% dirt and " flowerPct "% seed (dirt only on weeds)?", title, "YesNo") != "Yes")
+		return
+	sel := BotanySelArray()
+	WinActivate(BotanyGame)
+	Sleep 200
+	try
+	{
+		pts := Map()
+		for field in ["Dirt", "Flower"]
+			for c in ["max", "down", "interval", "up"]
+				pts[field " " c] := BotanyPoint(field " " c)
+		for i, pot in pots
+		{
+			BotanyDo(BotanyFrac(pot), "pot " i, false, 300)
+			plant := (IsObject(sel) && i + 1 <= sel.Length) ? sel[i + 1] : 0
+			steps := plant = 1 ? Map("Dirt", dirtPct) : Map("Dirt", dirtPct, "Flower", flowerPct)
+			for field, pct in steps
+			{
+				BotanyDo(pts[field " max"], "pot " i " " field " max", dryRun, 120)
+				Loop BotanyPrefillDowns
+					BotanyDo(pts[field " down"], field " down " A_Index, dryRun, 100)
+				BotanyDo(pts[field " interval"], field " interval", dryRun, 120)
+				Loop Round(pct / BotanyPrefillStep)
+					BotanyDo(pts[field " up"], field " up " A_Index, dryRun, 100)
+			}
+		}
+		BotanyDo(BotanyPoint("Blank area"), "deselect", false, 200)
+		ToolTip()
+		BotanyTip(dryRun ? "Dirt/seed dry run done" : "Every pot's dirt/seed set")
+	}
+	catch Error as e
+	{
+		ToolTip()
+		MsgBox("Stopped: " e.Message, title)
+	}
+}
+
+; Step 3: deselect (shows Grow All), press it, wait until the game's per-pot loop has finished, report.
+BotanyGrowAllNow(dryRun := true)
+{
+	title := dryRun ? "Grow All (dry run)" : "Grow All"
+	before := BotanyLiveState()
+	WinActivate(BotanyGame)
+	Sleep 200
+	try
+	{
+		BotanyDo(BotanyPoint("Blank area"), "blank area (shows Grow All)", dryRun)
+		BotanyDo(BotanyPoint("Grow All"), "Grow All", dryRun, 800)
+		if (dryRun || !IsObject(before))
+			return BotanyTip(dryRun ? "Grow All dry run done" : "Grow All pressed")
+		; Every pot flips state (empty -> planted, planted -> empty); wait for all of them.
+		was := []
+		for p in before
+			was.Push(p.state = "empty")
+		start := A_TickCount
+		loop
+		{
+			now := BotanyLiveState()
+			done := IsObject(now)
+			if (done)
+				for i, p in now
+					if (i <= was.Length && was[i] = (p.state = "empty"))
+						done := false
+			if (done || A_TickCount - start > 60000)
+				break
+			ToolTip("Waiting for Grow All to finish...")
+			Sleep 500
+		}
+		ToolTip()
+		r := "Plant per pot now (CDP):"
+		if (IsObject(now))
+			for p in now
+				r .= " " (p.state = "empty" ? "-" : p.plant)
+		MsgBox(r (done ? "" : "`n(timed out after 60 s)"), title)
+	}
+	catch Error as e
+	{
+		ToolTip()
+		MsgBox("Stopped: " e.Message, title)
+	}
+}
+
+; FlowerTypeSELECTED over CDP (index 0 unused, pot n is element n + 1), or "".
+BotanySelArray()
+{
+	out := A_Temp "\botany-sel.json"
+	try FileDelete(out)
+	try
+	{
+		RunWait(A_ComSpec ' /c ' BotanyStateCmd ' > "' out '" 2>nul',, "Hide")
+		json := FileRead(out)
+	}
+	catch
+		return ""
+	if (!RegExMatch(json, '"sel":\[([^\]]*)\]', &m))
+		return ""
+	sel := []
+	for v in StrSplit(m[1], ",")
+		sel.Push(IsNumber(v) ? v + 0 : 0)
+	return sel
+}
