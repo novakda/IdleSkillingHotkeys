@@ -432,7 +432,8 @@ BotanyRun(collect, slot, dryRun)
 		empty := 0, ready := 0
 		for p in live
 			empty += (p.state = "empty"), ready += (p.state = "ready")
-		if (!empty && !(collect && ready))
+		; Grow All clears every occupied pot, growing or ready, and growing pots still yield (Dan, 2026-10-29).
+		if (!empty && !(collect && empty < live.Length))
 			return MsgBox("Nothing to do: no pot is empty" (collect ? " or ready" : "") " (read over CDP).", title)
 	}
 	what := (collect ? "Collect all (Grow All), then plant " : "Plant ") (slot ? "sidebar slot " slot : "the next plant") " in every EMPTY pot?"
@@ -454,7 +455,7 @@ BotanyRun(collect, slot, dryRun)
 		; One CDP read for every pot's state (after Grow All has collected); the per-pot pixel check
 		; (~190 pixel reads, seconds per pot) is only the fallback when the debug connection is down.
 		; Grow All works through the pots one at a time (Dan), so wait until it has finished harvesting.
-		now := (collect && !dryRun) ? BotanyWaitPots((p) => p.state != "ready", 60000) : live
+		now := (collect && !dryRun) ? BotanyWaitPots((p) => p.state = "empty", 60000) : live
 		for i, pot in pots
 		{
 			BotanyDo(BotanyFrac(pot), "pot " i, false, 250)
