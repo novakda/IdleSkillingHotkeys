@@ -681,7 +681,7 @@ BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true, quiet := false, p
 }
 
 ; Step 3: deselect (shows Grow All), press it, wait until the game's per-pot loop has finished, report.
-BotanyGrowAllNow(dryRun := true, noReport := false)
+BotanyGrowAllNow(dryRun := true, noReport := false, tipReport := false)
 {
 	title := dryRun ? "Grow All (dry run)" : "Grow All"
 	before := BotanyLiveState()
@@ -716,7 +716,11 @@ BotanyGrowAllNow(dryRun := true, noReport := false)
 		if (IsObject(now))
 			for p in now
 				r .= " " (p.state = "empty" ? "-" : p.plant)
-		MsgBox(r (done ? "" : "`n(timed out after 60 s)"), title)
+		r .= done ? "" : " (timed out after 60 s)"
+		if (tipReport)
+			BotanyTip(r)
+		else
+			MsgBox(r, title)
 	}
 	catch Error as e
 	{
@@ -748,7 +752,7 @@ BotanySelArray()
 ; ---- Dan's routine (2026-10-29): every pot grows the same plant. On each visit: harvest everything, move every pot
 ; to the NEXT owned plant (after the last one, back to weeds), set 1% dirt + 1% seed, Grow All. Keeps seed for the
 ; next plant in stock over time. Uses sidebar slots (slot N = plant N), so unowned plants are skipped. ----
-BotanyAdvance(dryRun := true, dirtPct := 1, flowerPct := 1)
+BotanyAdvance(dryRun := true, dirtPct := 1, flowerPct := 1, forceNext := 0)
 {
 	title := dryRun ? "Advance botany (dry run)" : "Advance botany"
 	live := BotanyLiveState(), sel := BotanySelArray(), owned := BotanyOwned()
@@ -757,12 +761,15 @@ BotanyAdvance(dryRun := true, dirtPct := 1, flowerPct := 1)
 	; The plant now: what pot 1 is planted with (or set to, if empty).
 	cur := live[1].plant ? live[1].plant : (sel.Length >= 2 ? sel[2] : 1)
 	nxt := 1	; wrap to weeds
+	if (!forceNext)
 	Loop BotanySlotCount
 		if (A_Index > cur && A_Index + 1 <= owned.Length && owned[A_Index + 1] > 0)
 		{
 			nxt := A_Index
 			break
 		}
+	if (forceNext)
+		nxt := forceNext
 	early := 0, planted := 0
 	for p in live
 		early += (p.state = "growing"), planted += (p.state != "empty")
@@ -793,5 +800,8 @@ BotanyAdvance(dryRun := true, dirtPct := 1, flowerPct := 1)
 	; 2. every pot -> plant nxt, 3. dirt/seed, 4. Grow All to plant
 	BotanySetPlants(nxt, dryRun, true)
 	BotanyPrefillAll(dirtPct, flowerPct, dryRun, true, nxt)
-	BotanyGrowAllNow(dryRun)
+	BotanyGrowAllNow(dryRun, false, true)
 }
+
+; Reset: harvest, then every pot back to weeds (plant 1) with 1% dirt, Grow All.
+BotanyResetWeeds(dryRun := true) => BotanyAdvance(dryRun, 1, 1, 1)

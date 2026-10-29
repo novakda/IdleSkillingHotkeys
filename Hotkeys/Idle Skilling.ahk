@@ -60,6 +60,8 @@ Left:: PrevFlower
 ^g:: BotanyAdvance(true)	; ROUTINE (dry run): harvest, every pot to the next owned plant (wraps to weeds), 1% dirt+seed, Grow All
 
 ^!g:: BotanyAdvance(false)	; ROUTINE
+^!r:: BotanyResetWeeds(false)	; harvest, every pot back to weeds, 1% dirt, Grow All
+^+!r:: BotanyResetWeeds(true)	; same, dry run
 ^j:: BotanySetPlants(0, true)	; every pot: Next plant arrow only (dry run)
 ^!j:: BotanySetPlants(0, false)
 
