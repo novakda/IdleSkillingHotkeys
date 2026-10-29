@@ -271,11 +271,11 @@ BotanyPotState()
 				else
 					votes["ready"]++
 			}
-			y += 3
+			y += 6
 		}
-		x += 3
+		x += 6
 	}
-	best := "unknown", top := 14
+	best := "unknown", top := 4	; ~55 samples at a 6 px step (was 189 at 3 px, threshold 14)
 	for name, n in votes
 		if (n > top)
 			best := name, top := n
@@ -427,10 +427,13 @@ BotanyRun(collect, slot, dryRun)
 			BotanyDo(blankXY, "blank area (shows Grow All)", dryRun)
 			BotanyDo(allXY, "Grow All", dryRun, 1500)
 		}
+		; One CDP read for every pot's state (after Grow All has collected); the per-pot pixel check
+		; (~190 pixel reads, seconds per pot) is only the fallback when the debug connection is down.
+		now := (collect && !dryRun) ? BotanyLiveState() : live
 		for i, pot in pots
 		{
-			BotanyDo(BotanyFrac(pot), "pot " i, false, 400)
-			state := BotanyPotState()
+			BotanyDo(BotanyFrac(pot), "pot " i, false, 250)
+			state := (IsObject(now) && i <= now.Length) ? now[i].state : BotanyPotState()
 			if (state = "unknown")
 				throw Error("can't read pot " i "'s button (Botany screen open? pot positions right?)")
 			willCollect := dryRun && collect && (state = "ready" || state = "overgrown")
@@ -447,8 +450,8 @@ BotanyRun(collect, slot, dryRun)
 			if (slot && !BotanySlotPresent(slot))
 				throw Error("sidebar slot " slot " doesn't show its plant (none owned, or the sidebar moved)")
 			BotanyDo(pickXY, pick, dryRun, 250)
-			BotanyDo(growXY, "Grow", dryRun, 500)
-			report .= "Pot " i ": " (dryRun ? state (willCollect ? " (Grow All would collect it)" : "") ", would plant" : "planted, now " BotanyPotState()) "`n"
+			BotanyDo(growXY, "Grow", dryRun, 100)	; Dan: after Grow, move straight on
+			report .= "Pot " i ": " (dryRun ? state (willCollect ? " (Grow All would collect it)" : "") ", would plant" : "planted") "`n"
 		}
 	}
 	catch Error as e
