@@ -76,8 +76,8 @@ BotanyTip(text)
 
 ; ---- Botany controls ----
 ; Record each once: hover the control, press Ctrl+B, pick its name from the menu (sidebar plant icons are under
-; "Plant slot"). Saved to [Controls] in BotanyPots.ini, window-relative like the pots. Grow, Next plant and Blank area
-; fall back to the decoded game layout below when not recorded; every other control must be recorded before a macro
+; "Plant slot"). Saved to [Controls] in BotanyPots.ini, window-relative like the pots. Grow, Next plant, Blank area
+; and Grow All fall back to the game layout below when not recorded; every other control must be recorded before a macro
 ; uses it (a macro stops before its first click if one is missing). The Grow / plant / Dirt / Flower controls only
 ; show on a selected EMPTY pot, so record them with one selected.
 global BotanyControlNames := ["Blank area", "Grow All", "Grow", "Next plant", "Previous plant", "Next dirt", "Previous dirt"
@@ -159,7 +159,8 @@ PreviewBotanyControls()
 global BotanyNextPlant := [668, 420]	; next-plant arrow center (box 647,400 43x40)
 global BotanyGrowButton := [628, 467]	; Plant/Harvest button center (box 589,448 78x38)
 global BotanyDeselect := [705, 200]	; empty spot that deselects the pot
-global BotanyLayoutDefaults := Map("Grow", BotanyGrowButton, "Next plant", BotanyNextPlant, "Blank area", BotanyDeselect)
+global BotanyGrowAll := [116, 399]	; Grow All button center, no pot selected (CDP screenshot 2026-10-26, 958x572 window)
+global BotanyLayoutDefaults := Map("Grow", BotanyGrowButton, "Next plant", BotanyNextPlant, "Blank area", BotanyDeselect, "Grow All", BotanyGrowAll)
 global BotanyGame := "Idle Skilling ahk_exe IdleSkilling.exe"
 
 ; Game layout point -> window point, as [X, Y].

@@ -74,7 +74,7 @@ If the change is relevant for everyone, don't hesitate creating an issue on this
 One-time recording, on the Botany screen (Ctrl + Alt + P / Ctrl + Alt + B check them without clicking):
 
 1. Pots: hover each pot in order and press `Ctrl + P` (already done: 14 pots in BotanyPots.ini).
-2. Deselect any pot. Hover an empty spot, `Ctrl + B` > Blank area. Then hover Grow All, `Ctrl + B` > Grow All.
+2. Optional: Grow All, Grow, Next plant and Blank area have built-in positions from the game layout. Record them (`Ctrl + B`) only if Ctrl + Alt + B shows one is off.
 3. Select an EMPTY pot. With `Ctrl + B`, record Grow, Next plant, and for the dirt and the flower amounts: max, down, the interval button you use (1%), up.
 4. Still on the empty pot, hover each plant icon in the right sidebar and `Ctrl + B` > Plant slot > its number. Keep the mouse still while it samples the colour.
 5. Run each dry run (`Ctrl + G`, `Ctrl + F`, `Ctrl + L`) and check the tooltips land on the right things before using the Ctrl + Alt versions.
