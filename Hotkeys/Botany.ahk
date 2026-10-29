@@ -432,10 +432,17 @@ BotanyRun(collect, slot, dryRun)
 		empty := 0, ready := 0
 		for p in live
 			empty += (p.state = "empty"), ready += (p.state = "ready")
-		; Grow All clears every occupied pot, growing or ready, and growing pots still yield (Dan, 2026-10-29).
+		; Grow All clears every occupied pot. A pot yields once it has finished at least one growth cycle
+		; ("ready" = OVERGROWTH >= 1); one cleared before its first cycle yields nothing (Dan, 2026-10-29).
 		if (!empty && !(collect && empty < live.Length))
 			return MsgBox("Nothing to do: no pot is empty" (collect ? " or ready" : "") " (read over CDP).", title)
 	}
+	early := 0
+	if (collect && IsObject(live))
+		for p in live
+			early += (p.state = "growing")
+	if (early && MsgBox(early " pot(s) haven't finished a growth cycle yet; Grow All would clear them for no yield. Continue anyway?", title, "YesNo Icon!") != "Yes")
+		return
 	what := (collect ? "Collect all (Grow All), then plant " : "Plant ") (slot ? "sidebar slot " slot : "the next plant") " in every EMPTY pot?"
 	if (!dryRun && MsgBox(what "`nGrowing pots are skipped. Ctrl+E stops.", title, "YesNo") != "Yes")
 		return
