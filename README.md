@@ -48,12 +48,14 @@ If the change is relevant for everyone, don't hesitate creating an issue on this
 |`Ctrl + Alt + B`|Botany|Preview: move the mouse over every control the macros use, labelled, no clicks|
 |`Ctrl + H`|Botany|Dry run: select each pot, read whether it is empty/growing/ready, report what it would do. Plants nothing|
 |`Ctrl + Alt + H`|Botany|Replant: for every EMPTY pot, advance to the next plant and plant it. Growing and ready pots are skipped (the Plant button uproots growing pots)|
-|`Ctrl + G`|Botany|Dry run of Collect and replant: points at each click with a tooltip, reads each pot, plants nothing|
-|`Ctrl + Alt + G`|Botany|Collect and replant: blank area, Grow All, then for every EMPTY pot: Next plant, Grow (seed amounts unchanged)|
-|`Ctrl + F`|Botany|Dry run of Collect and plant: asks for a sidebar plant slot, then as Ctrl + G|
-|`Ctrl + Alt + F`|Botany|Collect and plant: asks for a sidebar plant slot; Grow All, then for every EMPTY pot: that slot's icon, Grow. Stops if the icon isn't there|
-|`Ctrl + L`|Botany|Dry run of Prefill on the selected empty pot|
-|`Ctrl + Alt + L`|Botany|Prefill the selected empty pot with 1% dirt and 1% flowers: Max, Down x4, interval, Up. Change the 1s in Idle Skilling.ahk|
+|`Ctrl + Alt + G`|Botany|**The routine, one keystroke:** harvest every pot (Grow All, waits until all are empty), set every pot to the NEXT plant you own from the sidebar (after the last, back to weeds), set 1% seed only when leaving weeds (the game keeps dirt and seed amounts), then Grow All to plant. Ends with a tooltip listing each pot's plant. Asks first only if a pot hasn't finished a growth cycle (it would yield nothing)|
+|`Ctrl + G`|Botany|Dry run of the routine: points at each click with a tooltip, changes nothing|
+|`Ctrl + Alt + R`|Botany|Reset: harvest, every pot back to weeds (sidebar slot 1), Grow All. `Ctrl + Shift + Alt + R` is the dry run|
+|`Ctrl + J` / `Ctrl + Alt + J`|Botany|Every pot: click the Next plant arrow (no Grow). Dry run / live|
+|`Ctrl + F` / `Ctrl + Alt + F`|Botany|Every pot: set plant N from the sidebar (asks N; slot N = plant N; stops if you don't own it). No Grow. Dry run / live|
+|`Ctrl + L` / `Ctrl + Alt + L`|Botany|Every pot: 1% dirt and 1% seed (dirt only on weeds): 25%, Down x4, 1%, Up. Dry run / live|
+|`Ctrl + A` / `Ctrl + Alt + A`|Botany|Grow All: the game runs its own per-pot Grow (plants empty pots, harvests planted ones), the macro waits and reports. Dry run / live|
+|`Ctrl + Alt + T`|Botany|Slot test: select pot 1 and click every sidebar plant slot in turn (selection only, no Grow)|
 |`S`|Crusade|Defeat a crusade and goes next|
 |`Ctrl + S`|Crusade|Toggle action for the action above (crusade + next)|
 |`R`|Boost|Maybe the most useful one. It resets and boosts your gear|
@@ -71,21 +73,31 @@ If the change is relevant for everyone, don't hesitate creating an issue on this
 
 ## Botany macros
 
-One-time recording, on the Botany screen (Ctrl + Alt + P / Ctrl + Alt + B check them without clicking):
+How it works (learned 2026-10-29): Grow All is the game's own per-pot Grow run in a loop, about 0.65 s per pot;
+on an empty pot it plants, on a planted pot it harvests (a pot yields once it has finished one growth cycle).
+The sidebar has 24 plant slots in a 2x12 grid (column 1 = plants 1-12, column 2 = 13-24); each plant has a
+fixed slot, and plants you don't own leave a gap. Weeds (plant 1) take dirt only; every later plant also takes
+the previous plant as seed. The game keeps each pot's last dirt and seed amounts.
 
-1. Pots: hover each pot in order and press `Ctrl + P` (already done: 14 pots in BotanyPots.ini).
-2. Optional: Grow All, Grow, Next plant and Blank area have built-in positions from the game layout. Record them (`Ctrl + B`) only if Ctrl + Alt + B shows one is off.
-3. Select an EMPTY pot. With `Ctrl + B`, record Grow, Next plant, and for the dirt and the flower amounts: max, down, the interval button you use (1%), up.
-4. Still on the empty pot, hover each plant icon in the right sidebar and `Ctrl + B` > Plant slot > its number. Keep the mouse still while it samples the colour.
-5. Run each dry run (`Ctrl + G`, `Ctrl + F`, `Ctrl + L`) and check the tooltips land on the right things before using the Ctrl + Alt versions.
+One-time recording, on the Botany screen (`Ctrl + Alt + P` / `Ctrl + Alt + B` check them without clicking):
 
-Safety: every click checks the game is the active window first, and a missing recording stops a macro before its first click.
-The Grow button uproots a growing pot, so a pot is only planted when its button reads empty right then. `Ctrl + E` stops everything.
+1. Pots: hover each pot in order and press `Ctrl + P` (done: 14 pots in BotanyPots.ini).
+2. With no pot selected: `Ctrl + B` > Blank area, and Grow All (it has a built-in default).
+3. Select a pot set to a plant after weeds, so both amount selectors show. With `Ctrl + B`, record Grow, Next plant,
+   and dirt/flower down and up. The interval row (1, 1k, 1m, 1b, 1%, 5%, 25%) is shared by both and already in
+   BotanyPots.ini.
+4. Sidebar: record slot 1, slot 12 and slot 13 (`Ctrl + B` > Plant slot); the rest are placed from the grid.
+   `Ctrl + Alt + T` checks them all.
+5. Dry-run first (`Ctrl + G`, `Ctrl + Shift + Alt + R`), then the live keys.
+
+Safety: every click checks the game is the active window; a missing recording stops a macro before its first click;
+`Ctrl + E` stops everything. The macros read the game over CDP (below) to know each pot's state and plant and what
+you own; without the debug connection, the routine refuses to run and the other macros fall back to pixel checks.
 
 ### OCR or CDP instead of pixels?
 
 - **OCR:** yes, AutoHotkey v2 can call the built-in Windows OCR (Windows.Media.Ocr) through the community `OCR.ahk` library (Descolada). It works on screen pixels, so it breaks on the same things as pixel checks (scale, overlays) and is slower.
-- **CDP (recommended):** the game is an Electron app. Started from the `Idle Skilling (debug)` shortcut (`--remote-debugging-port=9333`), its state can be read directly. The macros already do this when it is available: they run `bun src/botany-state.ts` from the idle-skilling-toolbox repo in WSL, which prints each pot's plant (`FlowerType`) and state (empty / growing / ready, from `HerbloreAnimationOVERGROWTH`) plus `flowersOwned`, read-only. That skips runs with nothing to do and reports what each pot holds afterwards. Without it the macros fall back to the pixel check; the pixel check still gates every Grow click either way.
+- **CDP (recommended):** the game is an Electron app. Started from the `Idle Skilling (debug)` shortcut (`--remote-debugging-port=9333`), its state can be read directly. The macros already do this when it is available: they run `bun src/botany-state.ts` from the idle-skilling-toolbox repo in WSL, which prints each pot's plant (`FlowerType`) and state (empty / growing / ready, from `HerbloreAnimationOVERGROWTH`) plus `flowersOwned`, read-only. It also reads `FlowerTypeSELECTED` (what each pot is set to grow). The macros use it to skip runs with nothing to do, pick the next owned plant, wait for Grow All to finish, and report each pot afterwards.
 
 ## Realm - Setups
 
