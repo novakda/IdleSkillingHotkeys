@@ -770,8 +770,11 @@ BotanyAdvance(dryRun := true, dirtPct := 1, flowerPct := 1)
 		. dirtPct "% dirt" (nxt = 1 ? "" : " + " flowerPct "% seed") "?"
 	if (early)
 		msg .= "`n`n" early " pot(s) haven't finished a growth cycle and would yield nothing."
-	if (!dryRun && MsgBox(msg, title, "YesNo" (early ? " Icon!" : "")) != "Yes")
+	; One keystroke (Dan): no confirmation unless some pot would be harvested for nothing.
+	if (!dryRun && early && MsgBox(msg, title, "YesNo Icon!") != "Yes")
 		return
+	if (!dryRun)
+		BotanyTip("Plant " cur " -> " nxt)
 	if (dryRun)
 		BotanyTip("Plant now " cur ", next " nxt)
 	; 1. harvest (Grow All on planted pots), wait until all are empty
