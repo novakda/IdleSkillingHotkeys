@@ -82,7 +82,7 @@ BotanyTip(text)
 ; show on a selected EMPTY pot, so record them with one selected.
 global BotanyControlNames := ["Blank area", "Grow All", "Grow", "Next plant", "Previous plant", "Next dirt", "Previous dirt"
 	, "Dirt max", "Dirt down", "Dirt interval", "Dirt up", "Flower max", "Flower down", "Flower interval", "Flower up"]
-global BotanySlotCount := 12	; right-sidebar plant slots offered in the record menu
+global BotanySlotCount := 24	; right-sidebar plant slots: a 2x12 grid, numbered down column 1 (1-12) then column 2 (13-24)
 
 RecordBotanyControl()
 {
@@ -125,10 +125,44 @@ BotanyControl(name)
 {
 	v := StrSplit(IniRead(BotanyPotsFile, "Controls", name, ""), ",")
 	if (v.Length < 2)
-		return ""
+		return RegExMatch(name, "^Slot (\d+)$", &m) ? BotanySlotFromGrid(m[1] + 0) : ""
 	for i, x in v
 		v[i] := x + 0
 	return v
+}
+
+; An unrecorded slot's position, derived from the recorded ones: the row step from the two recorded slots furthest
+; apart, the column's X from the recorded slots in that column. Returns [X, Y] with no colour, or "" if there isn't
+; enough recorded yet (needs two rows recorded somewhere, and one slot in the wanted column).
+; ponytail: assumes even row spacing; record a slot by hand if a derived one lands off its icon.
+BotanySlotFromGrid(n)
+{
+	rec := Map()
+	Loop BotanySlotCount
+	{
+		v := StrSplit(IniRead(BotanyPotsFile, "Controls", "Slot " A_Index, ""), ",")
+		if (v.Length >= 2)
+			rec[A_Index] := [v[1] + 0, v[2] + 0]
+	}
+	row := (k) => Mod(k - 1, 12)
+	col := (k) => (k - 1) // 12
+	lo := 0, hi := 0
+	for k in rec
+	{
+		if (!lo || row(k) < row(lo))
+			lo := k
+		if (!hi || row(k) > row(hi))
+			hi := k
+	}
+	if (!lo || row(hi) = row(lo))
+		return ""
+	step := (rec[hi][2] - rec[lo][2]) / (row(hi) - row(lo))
+	y := rec[lo][2] + (row(n) - row(lo)) * step
+	sx := 0, cnt := 0
+	for k, p in rec
+		if (col(k) = col(n))
+			sx += p[1], cnt++
+	return cnt ? [sx / cnt, y] : ""
 }
 
 ; Moves the mouse over each control a macro would use (recorded or layout default) and each recorded slot, labelled, without clicking.
@@ -144,7 +178,8 @@ PreviewBotanyControls()
 		catch
 			continue
 		MouseMove(p[1], p[2])
-		ToolTip(name (IsObject(BotanyControl(name)) ? "" : " (layout default)"))
+		c := BotanyControl(name)
+		ToolTip(name (!IsObject(c) ? " (layout default)" : (InStr(name, "Slot ") = 1 && c.Length < 3) ? " (from the grid)" : ""))
 		Sleep 800
 		shown++
 	}
@@ -253,8 +288,10 @@ global BotanySlotTolerance := 40
 BotanySlotPresent(n)
 {
 	c := BotanyControl("Slot " n)
-	if (!IsObject(c) || c.Length < 3)
-		throw Error("Slot " n " is not recorded yet (Ctrl+B > Plant slot)")
+	if (!IsObject(c))
+		throw Error("Slot " n " is not recorded, and the grid can't place it yet (record one slot in its column)")
+	if (c.Length < 3)
+		return true	; derived from the grid: no recorded colour to compare, so this click is unverified
 	p := BotanyFrac(c)
 	CoordMode("Pixel", "Window")
 	px := PixelGetColor(p[1], p[2])
