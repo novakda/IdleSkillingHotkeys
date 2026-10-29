@@ -453,16 +453,23 @@ BotanyRun(collect, slot, dryRun)
 	{
 		; Resolve every point first, so a missing recording stops before the first click.
 		pickXY := BotanyPoint(pick), growXY := BotanyPoint("Grow")
-		if (collect)
+		blankXY := BotanyPoint("Blank area"), allXY := BotanyPoint("Grow All")
+		; Grow All runs the game's own per-pot Grow in a loop: on empty pots it PLANTS, so only press it to
+		; harvest when something is planted (CDP); with every pot already empty, go straight to setting them.
+		harvest := collect && !(IsObject(live) && empty = live.Length)
+		if (harvest)
 		{
-			blankXY := BotanyPoint("Blank area"), allXY := BotanyPoint("Grow All")
 			BotanyDo(blankXY, "blank area (shows Grow All)", dryRun)
-			BotanyDo(allXY, "Grow All", dryRun, 1500)
+			BotanyDo(allXY, "Grow All (harvest)", dryRun, 1500)
 		}
 		; One CDP read for every pot's state (after Grow All has collected); the per-pot pixel check
 		; (~190 pixel reads, seconds per pot) is only the fallback when the debug connection is down.
 		; Grow All works through the pots one at a time (Dan), so wait until it has finished harvesting.
-		now := (collect && !dryRun) ? BotanyWaitPots((p) => p.state = "empty", 60000) : live
+		now := (harvest && !dryRun) ? BotanyWaitPots((p) => p.state = "empty", 60000) : live
+		if (harvest && !dryRun && IsObject(now))
+			for p in now
+				if (p.state != "empty")
+					throw Error("Grow All didn't empty every pot within 60 s; stopped before planting")
 		for i, pot in pots
 		{
 			BotanyDo(BotanyFrac(pot), "pot " i, false, 250)
