@@ -637,7 +637,7 @@ BotanySetPlants(slot := 0, dryRun := true, quiet := false)
 
 ; Loop 2: on every pot, set dirt (and the prior-plant seed, except for weeds: plant 1 has none) by the prefill
 ; steps: max (25%), down x BotanyPrefillDowns, interval (1%), up pct times. Plants per pot come from one CDP read.
-BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true, quiet := false, plantAll := 0)
+BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true, quiet := false, plantAll := 0, only := "")
 {
 	title := dryRun ? "Set dirt/seed (dry run)" : "Set dirt/seed"
 	pots := BotanyPots()
@@ -658,7 +658,7 @@ BotanyPrefillAll(dirtPct := 1, flowerPct := 1, dryRun := true, quiet := false, p
 		{
 			BotanyDo(BotanyFrac(pot), "pot " i, false, 300)
 			plant := plantAll ? plantAll : (IsObject(sel) && i + 1 <= sel.Length) ? sel[i + 1] : 0
-			steps := plant = 1 ? Map("Dirt", dirtPct) : Map("Dirt", dirtPct, "Flower", flowerPct)
+			steps := only = "Flower" ? Map("Flower", flowerPct) : plant = 1 ? Map("Dirt", dirtPct) : Map("Dirt", dirtPct, "Flower", flowerPct)
 			for field, pct in steps
 			{
 				BotanyDo(pts[field " max"], "pot " i " " field " max", dryRun, 120)
@@ -799,7 +799,10 @@ BotanyAdvance(dryRun := true, dirtPct := 1, flowerPct := 1, forceNext := 0)
 	}
 	; 2. every pot -> plant nxt, 3. dirt/seed, 4. Grow All to plant
 	BotanySetPlants(nxt, dryRun, true)
-	BotanyPrefillAll(dirtPct, flowerPct, dryRun, true, nxt)
+	; The game keeps each pot's last dirt and seed amounts (Dan, 2026-10-29), so only set what changed: seed
+	; when leaving weeds (weeds use no seed), nothing otherwise. Ctrl+L still sets both on demand.
+	if (cur = 1 && nxt != 1)
+		BotanyPrefillAll(dirtPct, flowerPct, dryRun, true, nxt, "Flower")
 	BotanyGrowAllNow(dryRun, false, true)
 }
 
